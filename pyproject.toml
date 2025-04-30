@@ -5,8 +5,10 @@ description = "LoRA training for arxiv recommender"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "accelerate>=1.6.0",
     "datasets>=3.5.1",
     "kaggle>=1.7.4.2",
     "peft>=0.15.2",
+    "scikit-learn>=1.6.1",
     "transformers>=4.51.3",
 ]
