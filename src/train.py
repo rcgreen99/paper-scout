@@ -30,14 +30,14 @@ def get_dataset(dataset_path: str, tokenizer: AutoTokenizer) -> Dataset:
     ds = ds.filter(lambda ex: ex["abstract"] is not None and len(ex["abstract"]) > 50)
 
     # Tokenize abstracts
-    tokenizer.model_max_length = 64  # Can try 256 later
+    tokenizer.model_max_length = 256  # Can try 256 later
 
     def tok(examples):
         return tokenizer(
             examples["abstract"],
             truncation=True,
             padding="max_length",
-            max_length=64,
+            max_length=256,
         )
 
     tokenized = ds.map(
@@ -95,9 +95,9 @@ def train(
     logging.info("Defining LoRA config...")
     # 1) Define LoRA
     lora_config = LoraConfig(
-        r=8,
+        r=16,
         lora_alpha=32,
-        target_modules=["query", "value"],
+        target_modules=["query", "key", "value"],
         lora_dropout=0.05,
         bias="none",
         task_type="CAUSAL_LM",
@@ -117,18 +117,21 @@ def train(
         per_device_train_batch_size=128,
         per_device_eval_batch_size=128,
         gradient_accumulation_steps=1,
-        learning_rate=3e-4,
+        learning_rate=5e-4,
         num_train_epochs=3,
         fp16=True,
         eval_strategy="steps",
-        eval_steps=1000,
+        eval_steps=100000,
         save_strategy="steps",
-        save_steps=10000,
-        # logging_strategy="epoch",
+        save_steps=100000,
+        logging_strategy="steps",
+        logging_steps=10000,
         load_best_model_at_end=True,
         metric_for_best_model="eval_loss",
         greater_is_better=False,
         save_total_limit=2,
+        warmup_ratio=0.1,
+        weight_decay=0.01,
     )
 
     trainer = Trainer(
@@ -160,12 +163,14 @@ if __name__ == "__main__":
     tokenized_ds = get_dataset(DATASET_PATH, tokenizer)
 
     # 3) Split into train/validation
-    # ds_dict = tokenized_ds.train_test_split(test_size=0.1, seed=42)
-    debug_ds = tokenized_ds.shuffle(seed=42).select(range(1_000_000))
+    ds_dict = tokenized_ds.train_test_split(test_size=0.1, seed=42)
+
+    # debug_ds = tokenized_ds.shuffle(seed=42).select(range(1_000_000))
     # debug_ds = tokenized_ds.shuffle(seed=42).select(range(10_000))
     # debug_ds = tokenized_ds.shuffle(seed=42).select(range(1_000))
     # debug_ds = tokenized_ds.shuffle(seed=42).select(range(100))
-    ds_dict = debug_ds.train_test_split(test_size=0.1, seed=42)
+    # ds_dict = debug_ds.train_test_split(test_size=0.1, seed=42)
+
     train_ds = ds_dict["train"]
     eval_ds = ds_dict["test"]
     # 4) Train with validation
